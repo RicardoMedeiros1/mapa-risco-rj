@@ -19,13 +19,15 @@ const ST = {
   FO: {r: 2, t: 'FORA DAS ÁREAS MAPEADAS', sh: 'Fora', ic: '✓'},
   IM: {r: 1, t: 'LOCALIZAÇÃO IMPRECISA', sh: 'Impreciso', ic: '?'}
 };
+const OSM_AT = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
 const BASES = {
-  ruas:   {n: 'Ruas', url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', sub: 'abcd', dark: false,
-           at: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'},
-  escuro: {n: 'Escuro', url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', sub: 'abcd', dark: true,
-           at: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'},
-  osm:    {n: 'OSM', url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', sub: '', dark: false,
-           at: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}
+  ruas:     {n: 'Ruas', dark: false, layers: [{url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', at: OSM_AT}]},
+  satelite: {n: 'Satélite', dark: true, layers: [
+    {url: ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', at: 'Imagens &copy; Esri, Maxar, Earthstar Geographics'},
+    {url: ESRI + 'Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', at: ''},
+    {url: ESRI + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', at: ''}]},
+  escuro:   {n: 'Escuro', dark: true, layers: [{url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', at: OSM_AT, cls: 'inv'}]}
 };
 
 const $ = id => document.getElementById(id);
@@ -229,8 +231,7 @@ function setBase(k) {
   baseKey = k; store.set('base', k);
   if (baseLayer) map.removeLayer(baseLayer);
   const b = BASES[k];
-  baseLayer = L.tileLayer(b.url, {subdomains: b.sub || 'abc', maxZoom: 19, maxNativeZoom: 19, attribution: b.at, detectRetina: false, crossOrigin: true}).addTo(map);
-  baseLayer.bringToBack();
+  baseLayer = L.layerGroup(b.layers.map(l => L.tileLayer(l.url, {maxZoom: 19, maxNativeZoom: 19, attribution: l.at, className: l.cls || '', crossOrigin: true}))).addTo(map);
   document.body.classList.toggle('dark', b.dark);
   document.querySelectorAll('#bases button').forEach(x => x.classList.toggle('on', x.dataset.k === k));
 }
@@ -624,7 +625,7 @@ function buildPanel() {
   $('about').innerHTML = `
   <p><b>Como usar:</b> busque um endereço, rua, CEP ou comunidade, ou toque em qualquer ponto do mapa. O painel mostra se o local está dentro/perto de uma área e lista as favelas no raio escolhido. Com o botão de GPS (◎) o mapa acompanha você e avisa ao chegar perto de uma área (toque de novo para soltar/desligar).</p>
   <p><b>Instalar como app:</b> ${isIOS ? 'no Safari, toque em Compartilhar › “Adicionar à Tela de Início”.' : 'no menu do navegador, toque em “Instalar app” ou “Adicionar à tela inicial”.'} Os alertas só funcionam com o app aberto na tela.</p>
-  <p><b>Fontes:</b> áreas do mapa colaborativo “[UTILIDADE PÚBLICA] Mapa Das Facções RJ” (Google My Maps), copiado em 11/11/2026 — não oficial, divisas aproximadas. Ruas e CEPs: <a href="https://www.cepaberto.com/" target="_blank" rel="noopener">CEP Aberto</a> (ODbL) com coordenadas do CNEFE/IBGE (Censo 2022). Busca de endereços: <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a>/OpenStreetMap. Mapa base: © OpenStreetMap, © CARTO.</p>
+  <p><b>Fontes:</b> áreas do mapa colaborativo “[UTILIDADE PÚBLICA] Mapa Das Facções RJ” (Google My Maps), copiado em 11/11/2026 — não oficial, divisas aproximadas. Ruas e CEPs: <a href="https://www.cepaberto.com/" target="_blank" rel="noopener">CEP Aberto</a> (ODbL) com coordenadas do CNEFE/IBGE (Censo 2022). Busca de endereços: <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a>/OpenStreetMap. Mapa base: © OpenStreetMap; satélite © Esri.</p>
   <p><b>Níveis:</b> Dentro = ponto dentro de área marcada · Muito perto = até 150 m · Próximo = até 600 m · Fora = nada a menos de 600 m (não é garantia de segurança).</p>`;
 }
 $('menu').onclick = () => { $('panel').hidden = false; };

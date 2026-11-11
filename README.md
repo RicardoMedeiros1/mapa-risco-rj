@@ -16,6 +16,6 @@ App web (PWA) para consultar no mapa as áreas marcadas como dominadas por facç
 | `data/areas.json` | Mapa colaborativo “[UTILIDADE PÚBLICA] Mapa Das Facções RJ” (Google My Maps), copiado em 11/11/2026 | dados públicos de terceiros |
 | `data/ruas.json` | Ruas/CEPs do [CEP Aberto](https://www.cepaberto.com/) + coordenadas do CNEFE (IBGE, Censo 2022) via [cep-geo-br](https://github.com/rudycerri-eng/cep-geo-br) | ODbL 1.0 (CEP Aberto) |
 
-Busca de endereços: [Photon](https://photon.komoot.io) (OpenStreetMap). Mapa base: © OpenStreetMap, © CARTO. Biblioteca de mapa: Leaflet (BSD-2).
+Busca de endereços: [Photon](https://photon.komoot.io) (OpenStreetMap). Mapa base: © OpenStreetMap; satélite © Esri. Biblioteca de mapa: Leaflet (BSD-2).
 
 **Aviso:** o mapa de áreas é colaborativo e não oficial; as divisas são aproximadas e mudam com o tempo. Use como referência, não como garantia de segurança.

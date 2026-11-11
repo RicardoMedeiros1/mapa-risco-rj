@@ -1,5 +1,5 @@
 /* Service worker: app e dados funcionam offline; mapa base fica em cache conforme você navega. */
-const V = 'v1';
+const V = 'v2';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'vendor/leaflet.js', 'vendor/leaflet.css',
   'icons/icon-192.png', 'icons/apple-touch-icon.png', 'data/areas.json', 'data/ruas.json'];
 self.addEventListener('install', e => {
@@ -19,15 +19,17 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
   if (u.origin === location.origin) {
-    // usa o cache na hora e atualiza em segundo plano
+    const isData = u.pathname.includes('/data/');
     e.respondWith(caches.open('shell-' + V).then(async c => {
       const hit = await c.match(e.request, {ignoreSearch: true});
-      const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; }).catch(() => hit);
-      return hit || net;
+      const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; });
+      // dados: usa o cache na hora e atualiza por trás; app: busca a versão nova e cai no cache se estiver offline
+      if (isData && hit) { net.catch(() => {}); return hit; }
+      return net.catch(() => hit || Response.error());
     }));
     return;
   }
-  if (/basemaps\.cartocdn\.com$|tile\.openstreetmap\.org$/.test(u.hostname)) {
+  if (/tile\.openstreetmap\.org$|arcgisonline\.com$/.test(u.hostname)) {
     e.respondWith(caches.open('tiles').then(async c => {
       const hit = await c.match(e.request);
       if (hit) return hit;

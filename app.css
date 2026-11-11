@@ -11,6 +11,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .leaflet-container{font:inherit}
 .leaflet-control-attribution{font-size:10px;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .leaflet-control-zoom{display:none}
+.inv{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88)}
 
 /* top bar */
 #top{position:fixed;left:0;right:0;top:0;padding:calc(10px + var(--st)) 10px 0;z-index:1000;pointer-events:none}
