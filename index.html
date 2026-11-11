@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Risco RJ">
+<meta name="description" content="Mapa de áreas de risco do RJ com busca por rua, CEP e endereço, GPS e alertas.">
+<title>Mapa de Risco RJ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="map"></div>
+
+<div id="top">
+  <div class="sbar" id="sbar">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="text" inputmode="search" placeholder="Endereço, rua, CEP ou comunidade" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    <button class="ib" id="clr" aria-label="Limpar" hidden>×</button>
+    <button class="ib" id="menu" aria-label="Camadas e opções"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg></button>
+  </div>
+  <div id="results" hidden></div>
+  <button id="gbanner" hidden></button>
+</div>
+
+<div id="fabs">
+  <button class="fab" id="gps" aria-label="Minha localização"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg></button>
+</div>
+
+<div id="sheet" hidden>
+  <button id="handle" aria-label="Expandir"><span></span></button>
+  <button class="x" id="sclose" aria-label="Fechar">×</button>
+  <div id="sbody"></div>
+</div>
+
+<div id="panel" hidden>
+  <div class="pin">
+    <div class="ph"><b>Camadas e opções</b><button class="x" id="pclose" aria-label="Fechar">×</button></div>
+    <div class="sec">Mapa base</div>
+    <div class="seg" id="bases"></div>
+    <div class="sec">Áreas (toque para mostrar/ocultar)</div>
+    <div id="legend"></div>
+    <div class="sec">Navegação</div>
+    <label class="tg"><input type="checkbox" id="o-sound"> Som de alerta ao chegar perto de uma área</label>
+    <label class="tg"><input type="checkbox" id="o-vib"> Vibrar (Android)</label>
+    <label class="tg"><input type="checkbox" id="o-wake"> Manter a tela ligada com o GPS ativo</label>
+    <div class="sec">Sobre</div>
+    <div id="about"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="boot"><div class="spin"></div><div>Carregando áreas…</div></div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
