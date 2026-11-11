@@ -388,9 +388,9 @@ function searchStreets(P, lim) {
     const core = U.NSC[G.st];
     let sc = sh * 10 + lh * 6;
     if (sh === R.length) sc += 20;
-    if (R[0].some(a => core.startsWith(a))) sc += 15;
+    if (R[0].some(a => U.NSCK[G.st].startsWith(a))) sc += 15;
     if (core === P.core) sc += 40; else if (U.NSCK[G.st] === mt.join(' ')) sc += 30;
-    if (T.length) sc += T.some(t => hs.startsWith(' ' + t)) ? 15 : -8;
+    if (T.length) sc += T.some(t => hs.startsWith(' ' + t)) ? 15 : -14;
     if (U.BIG[g]) sc -= 25;
     sc -= hs.length * 0.04;
     out.push([sc, g]);
