@@ -31,6 +31,20 @@ const BASES = {
 };
 
 const $ = id => document.getElementById(id);
+/* tamanho do texto (1 normal, 2 grande, 3 extra) e altura real da tela */
+function applyTextSize(n) { const h = document.documentElement; h.classList.remove('t2', 't3'); if (n > 1) h.classList.add('t' + n); }
+try { applyTextSize(+(localStorage.getItem('rrj.tsize') || 1)); } catch (e) {}
+const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 17;
+function syncViewport() {
+  const vv = window.visualViewport, h = vv ? vv.height : window.innerHeight;
+  document.documentElement.style.setProperty('--vh', (window.innerHeight / 100) + 'px');
+  document.documentElement.style.setProperty('--vvh', h + 'px');
+  try { if (map) map.invalidateSize({pan: false}); } catch (e) { /* mapa ainda não criado */ }
+}
+syncViewport();
+window.addEventListener('resize', syncViewport);
+window.addEventListener('orientationchange', () => setTimeout(syncViewport, 300));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', syncViewport);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const fmtD = d => d < 1000 ? Math.max(10, Math.round(d / 10) * 10) + ' m' : (d / 1000).toFixed(1).replace('.', ',') + ' km';
 const fmtCep = c => { const s = String(c).padStart(8, '0'); return s.slice(0, 5) + '-' + s.slice(5); };
@@ -242,12 +256,13 @@ function refreshLabels() {
   const x0 = b.getWest() * KX, x1 = b.getEast() * KX, y0 = b.getSouth() * KY, y1 = b.getNorth() * KY;
   const mpp = 156543.03 * Math.cos(-22.9 * Math.PI / 180) / Math.pow(2, z); // metros por pixel
   const vis = AR.filter(a => !hidden.has(a.gk) && a.maxx > x0 && a.minx < x1 && a.maxy > y0 && a.miny < y1)
-    .map(a => [a, Math.max(a.maxx - a.minx, a.maxy - a.miny) / mpp]).filter(([a, px]) => z >= 15 || px > 40)
+    .map(a => [a, Math.max(a.maxx - a.minx, a.maxy - a.miny) / mpp]).filter(([a, px]) => z >= 15 || px > 50)
     .sort((p, q) => q[1] - p[1]).slice(0, 140);
   const placed = [];
+  if (sel && sel.kind !== 'gps') { const q = map.latLngToContainerPoint([sel.lat, sel.lon]); placed.push([q.x - 22, q.y - 52, 44, 56]); }
   for (const [a] of vis) {
     const p = map.latLngToContainerPoint([a.llat, a.llon]);
-    const w = Math.min(180, a.name.length * 6.6 + 14), h = 18, r = [p.x - w / 2, p.y - h / 2, w, h];
+    const f = remPx() / 17, w = Math.min(12 * remPx(), a.name.length * 7.6 * f + 18), h = 22 * f, r = [p.x - w / 2, p.y - h / 2, w, h];
     if (placed.some(q => r[0] < q[0] + q[2] && r[0] + r[2] > q[0] && r[1] < q[1] + q[3] && r[1] + r[3] > q[1])) continue;
     placed.push(r);
     L.marker([a.llat, a.llon], {interactive: false, keyboard: false, icon: L.divIcon({className: 'alabel', iconSize: null,
@@ -274,6 +289,7 @@ function selectPoint(lat, lon, o) {
   }
   drawSel();
   renderSheet();
+  refreshLabels();
   if (o.fly) {
     const z = Math.max(map.getZoom(), radius > 1500 ? 14 : 15);
     flyToVisible(lat, lon, Math.min(16, z));
@@ -327,7 +343,7 @@ function renderSheet() {
     <div class="note">Mapa colaborativo, não oficial. As divisas são aproximadas e mudam; na dúvida, confirme com quem conhece o local.</div>`;
   openSheet();
 }
-function openSheet() { const sh = $('sheet'); sh.hidden = false; $('fabs').style.bottom = `calc(${sh.classList.contains('full') ? 86 : 46}vh + 14px)`; }
+function openSheet() { const sh = $('sheet'); sh.hidden = false; $('fabs').style.bottom = `calc(${sh.classList.contains('full') ? 88 : 48} * var(--vh) + .8rem)`; }
 function closeSheet() { $('sheet').hidden = true; $('sheet').classList.remove('full'); $('fabs').style.bottom = ''; sel = null; selLayer.clearLayers(); }
 $('sclose').onclick = closeSheet;
 $('handle').onclick = () => { $('sheet').classList.toggle('full'); openSheet(); };
@@ -607,12 +623,20 @@ function renderBanner(k, as, x, y, acc) {
 }
 $('gbanner').onclick = () => { if (gps.pos) { selectPoint(gps.pos.lat, gps.pos.lon, {kind: 'gps', acc: gps.pos.acc}); } };
 $('q').addEventListener('focus', () => { $('gbanner').hidden = true; });
-$('q').addEventListener('blur', () => setTimeout(() => { if (gps.on && $('results').hidden) $('gbanner').hidden = false; }, 250));
+$('q').addEventListener('blur', () => setTimeout(() => { window.scrollTo(0, 0); document.body.scrollTop = 0; syncViewport(); if (gps.on && $('results').hidden) $('gbanner').hidden = false; }, 120));
 
 /* ===================== painel de opções ===================== */
 function buildPanel() {
   $('bases').innerHTML = Object.entries(BASES).map(([k, b]) => `<button data-k="${k}" class="${k === baseKey ? 'on' : ''}">${b.n}</button>`).join('');
   $('bases').onclick = e => { const b = e.target.closest('button'); if (b) setBase(b.dataset.k); };
+  const ts = store.get('tsize', 1);
+  $('tsize').innerHTML = ['Normal', 'Grande', 'Extra'].map((n, i) => `<button data-t="${i + 1}" class="${ts === i + 1 ? 'on' : ''}">${n}</button>`).join('');
+  $('tsize').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return; const n = +b.dataset.t;
+    store.set('tsize', n); applyTextSize(n);
+    $('tsize').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    refreshLabels(); if (!$('sheet').hidden) openSheet();
+  };
   const cnt = {}; for (const a of AR) cnt[a.gk] = (cnt[a.gk] || 0) + 1;
   $('legend').innerHTML = META.groups.map(g => `<button class="lg${hidden.has(g) ? ' off' : ''}" data-g="${g}"><i style="background:${GDEF[g].c}"></i>${esc(GDEF[g].n)} <span style="color:var(--mu)">${cnt[g] || 0}</span></button>`).join('');
   $('legend').onclick = e => {

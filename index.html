@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b0f14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Risco RJ">
 <meta name="description" content="Mapa de áreas de risco do RJ com busca por rua, CEP e endereço, GPS e alertas.">
 <title>Mapa de Risco RJ</title>
@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=5">
 </head>
 <body>
 <div id="map"></div>
@@ -45,6 +45,8 @@
     <div class="ph"><b>Camadas e opções</b><button class="x" id="pclose" aria-label="Fechar">×</button></div>
     <div class="sec">Mapa base</div>
     <div class="seg" id="bases"></div>
+    <div class="sec">Tamanho do texto</div>
+    <div class="seg" id="tsize"></div>
     <div class="sec">Áreas (toque para mostrar/ocultar)</div>
     <div id="legend"></div>
     <div class="sec">Navegação</div>
@@ -60,6 +62,6 @@
 <div id="boot"><div class="spin"></div><div>Carregando áreas…</div></div>
 
 <script src="vendor/leaflet.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 /* Service worker: app e dados funcionam offline; mapa base fica em cache conforme você navega. */
-const V = 'v2';
+const V = 'v3';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'vendor/leaflet.js', 'vendor/leaflet.css',
-  'icons/icon-192.png', 'icons/apple-touch-icon.png', 'data/areas.json', 'data/ruas.json'];
+  'icons/icon-192.png', 'icons/apple-touch-icon.png', 'icons/maskable-512.png', 'data/areas.json', 'data/ruas.json'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open('shell-' + V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
