@@ -1,6 +1,6 @@
 'use strict';
 /* Mapa de Risco RJ — app de mapa com busca, GPS, rotas e alertas. Tudo roda no aparelho. */
-const APP_VERSION = '2026.11.13.2';
+const APP_VERSION = '2026.11.13.3';
 
 const LAT0 = -22.5, KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 110540;
 const GDEF = {
@@ -763,7 +763,9 @@ function evalRoute(rt) {
     }
   }
   const list = [...hits.values()].sort((p, q) => p.pos - q.pos);
-  const crossed = list.filter(h => h.inM > 0), near = list.filter(h => h.inM === 0);
+  // menos de 20 m dentro = só encosta na divisa (ruído do ponto de partida/chegada)
+  const crossed = list.filter(h => h.inM >= 20), near = list.filter(h => h.inM < 20);
+  for (const h of near) if (h.inM > 0) h.minD = 0;
   return {P, crossed, near, inM: crossed.reduce((s, h) => s + h.inM, 0), segs, dist: rt.distance, dur: rt.duration, ll: C.map(([lo, la]) => [la, lo])};
 }
 const routeScore = r => (r.inM > 0 ? 1e9 : 0) + r.inM * 1e4 + r.near.length * 120 + r.dur;
