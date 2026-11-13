@@ -19,7 +19,7 @@ async function trim(c) {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
-  if (u.origin === location.origin && u.pathname.endsWith('/version.json')) return; // sempre da rede
+  if (u.origin === location.origin && /\/(version\.json|atualizar\.html)$/.test(u.pathname)) return; // sempre da rede
   if (u.origin === location.origin) {
     const isData = u.pathname.includes('/data/');
     e.respondWith(caches.open('shell-' + V).then(async c => {

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Atualizando Mapa de Risco RJ…</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0f14;color:#e8eef4;font:18px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
+  .spin{width:44px;height:44px;border-radius:50%;border:4px solid #253244;border-top-color:#38bdf8;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  a{color:#04121b;background:#38bdf8;border-radius:14px;padding:14px 22px;font-weight:700;text-decoration:none}
+  small{color:#9aabbc}
+</style>
+</head>
+<body>
+<main>
+  <div class="spin" id="sp"></div>
+  <div id="msg">Limpando a versão antiga do app…</div>
+  <a id="go" href="./?r=1" hidden>Abrir o app atualizado</a>
+  <small id="det"></small>
+</main>
+<script>
+/* Página de reparo: não depende de nenhum outro arquivo, então funciona mesmo com a versão antiga presa no aparelho. */
+(async () => {
+  const det = [];
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const r of regs) await r.unregister();
+      det.push(regs.length + ' serviço(s) antigo(s) removido(s)');
+    }
+    if (window.caches) {
+      const ks = await caches.keys();
+      for (const k of ks) await caches.delete(k);
+      det.push(ks.length + ' cópia(s) apagada(s)');
+    }
+  } catch (e) { det.push('aviso: ' + e.message); }
+  document.getElementById('det').textContent = det.join(' · ');
+  document.getElementById('sp').hidden = true;
+  document.getElementById('msg').textContent = 'Pronto! Abrindo a versão nova…';
+  const go = document.getElementById('go'); go.href = './?r=' + Date.now(); go.hidden = false;
+  setTimeout(() => location.replace(go.href), 1200);
+})();
+</script>
+</body>
+</html>
