@@ -1,9 +1,10 @@
 /* Service worker: app e dados funcionam offline; mapa base fica em cache conforme você navega. */
-const V = 'v4';
+const V = 'v5';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'vendor/leaflet.js', 'vendor/leaflet.css',
   'icons/icon-192.png', 'icons/apple-touch-icon.png', 'icons/maskable-512.png', 'data/areas.json', 'data/ruas.json'];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open('shell-' + V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' = pega do servidor, nunca da cópia antiga do navegador
+  e.waitUntil(caches.open('shell-' + V).then(c => c.addAll(SHELL.map(u => new Request(u, {cache: 'reload'})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('shell-') && k !== 'shell-' + V).map(k => caches.delete(k))))
@@ -23,7 +24,9 @@ self.addEventListener('fetch', e => {
     const isData = u.pathname.includes('/data/');
     e.respondWith(caches.open('shell-' + V).then(async c => {
       const hit = await c.match(e.request, {ignoreSearch: true});
-      const net = fetch(e.request).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; });
+      // no-cache = sempre confere com o servidor (rápido: volta 304 se nada mudou)
+      const req = e.request.mode === 'navigate' ? new Request(u.href, {cache: 'no-cache', credentials: 'same-origin'}) : new Request(e.request, {cache: isData ? 'default' : 'no-cache'});
+      const net = fetch(req).then(r => { if (r.ok) c.put(e.request, r.clone()); return r; });
       // dados: usa o cache na hora e atualiza por trás; app: busca a versão nova e cai no cache se estiver offline
       if (isData && hit) { net.catch(() => {}); return hit; }
       return net.catch(() => hit || Response.error());

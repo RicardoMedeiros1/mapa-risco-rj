@@ -1,6 +1,6 @@
 'use strict';
 /* Mapa de Risco RJ — app de mapa com busca, GPS, rotas e alertas. Tudo roda no aparelho. */
-const APP_VERSION = '2026.11.13';
+const APP_VERSION = '2026.11.13.2';
 
 const LAT0 = -22.5, KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 110540;
 const GDEF = {
@@ -870,6 +870,7 @@ async function checkUpdate(manual) {
   try {
     if (swReg) swReg.update().catch(() => {});
     const j = await (await fetch('version.json?ts=' + Date.now(), {cache: 'no-store'})).json();
+    if (j.v && j.v !== APP_VERSION && swReg) { try { await swReg.update(); } catch (e) {} }
     if (j.v && j.v !== APP_VERSION) {
       const last = +(sessionStorage.getItem('rrj.upd') || 0);
       if (Date.now() - last > 60000) { sessionStorage.setItem('rrj.upd', Date.now()); safeReload('Nova versão encontrada. Atualizando…'); }
