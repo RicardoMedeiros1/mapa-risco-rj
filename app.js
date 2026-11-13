@@ -1,6 +1,6 @@
 'use strict';
 /* Mapa de Risco RJ — app de mapa com busca, GPS, rotas e alertas. Tudo roda no aparelho. */
-const APP_VERSION = '2026.11.13.3';
+const APP_VERSION = '2026.11.13.4';
 
 const LAT0 = -22.5, KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 110540;
 const GDEF = {
@@ -249,7 +249,11 @@ function initMap() {
   selLayer = L.layerGroup().addTo(map);
   meLayer = L.layerGroup().addTo(map);
   map.on('moveend', () => { refreshLabels(); const c = map.getCenter(); store.set('view', [+c.lat.toFixed(5), +c.lng.toFixed(5), map.getZoom()]); });
-  map.on('click', e => { if (!$('results').hidden) { closeResults(); return; } selectPoint(e.latlng.lat, e.latlng.lng, {kind: 'tap'}); });
+  map.on('click', e => {
+    if (!$('results').hidden) { closeResults(); return; }
+    if (!$('sheet').hidden) { closeSheet(); return; }   // com o painel aberto, tocar no mapa fecha o pin
+    selectPoint(e.latlng.lat, e.latlng.lng, {kind: 'tap'});
+  });
   map.on('dragstart', () => { if (gps.follow) setFollow(false); });
   refreshLabels();
 }
@@ -361,7 +365,28 @@ function renderSheet() {
 function openSheet() { const sh = $('sheet'); sh.hidden = false; $('fabs').style.bottom = `calc(${sh.classList.contains('full') ? 88 : 48} * var(--vh) + .8rem)`; }
 function closeSheet() { $('sheet').hidden = true; $('sheet').classList.remove('full'); $('fabs').style.bottom = ''; sel = null; selLayer.clearLayers(); clearRoutes(); }
 $('sclose').onclick = closeSheet;
-$('handle').onclick = () => { $('sheet').classList.toggle('full'); openSheet(); };
+(function sheetDrag() {
+  const sh = $('sheet'); let y0 = null, h0 = 0, moved = false;
+  const start = e => { if (!e.target.closest('#handle, .sh-t, .sh-s')) return; y0 = e.touches ? e.touches[0].clientY : e.clientY; h0 = sh.getBoundingClientRect().height; moved = false; sh.style.transition = 'none'; };
+  const move = e => {
+    if (y0 == null) return; const y = e.touches ? e.touches[0].clientY : e.clientY, dy = y - y0;
+    if (Math.abs(dy) > 6) moved = true;
+    if (moved) { sh.style.height = Math.max(80, h0 - dy) + 'px'; if (e.cancelable) e.preventDefault(); }
+  };
+  const end = e => {
+    if (y0 == null) return; const y = e.changedTouches ? e.changedTouches[0].clientY : e.clientY, dy = y - y0; y0 = null;
+    sh.style.transition = ''; sh.style.height = '';
+    if (!moved) return;
+    if (dy > 70) { if (sh.classList.contains('full')) { sh.classList.remove('full'); openSheet(); } else closeSheet(); }
+    else if (dy < -70) { sh.classList.add('full'); openSheet(); }
+  };
+  sh.addEventListener('touchstart', start, {passive: true}); sh.addEventListener('touchmove', move, {passive: false}); sh.addEventListener('touchend', end);
+  sh.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') start(e); });
+  window.addEventListener('pointermove', e => { if (e.pointerType === 'mouse') move(e); });
+  window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(e); });
+  $('handle').onclick = () => { if (moved) return; sh.classList.toggle('full'); openSheet(); };
+})();
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sheet').hidden && document.activeElement !== $('q')) closeSheet(); });
 $('sbody').addEventListener('click', async e => {
   const rb = e.target.closest('[data-rad]');
   if (rb) { radius = +rb.dataset.rad; store.set('radius', radius); if (sel) { sel.as = assess(sel.x, sel.y, Math.max(3000, radius)); drawSel(); renderSheet(); const c = L.latLng(sel.lat, sel.lon).toBounds(radius * 2.2); map.flyToBounds(c, {paddingBottomRight: [0, $('sheet').getBoundingClientRect().height], duration: 0.5}); } return; }

@@ -32,6 +32,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .ib{flex:none;width:2.8rem;height:2.8rem;border:0;background:none;border-radius:.8rem;display:flex;align-items:center;justify-content:center;font-size:1.6rem;line-height:1}
 .ib svg{width:1.5rem;height:1.5rem}
 .ib:active{background:var(--panel2)}
+.ib[hidden]{display:none}
 #results{margin-top:.5rem;background:var(--panel);border:1px solid var(--line);border-radius:1.1rem;
   max-height:calc(var(--vvh, 100vh) - 5.5rem - var(--st));overflow:auto;-webkit-overflow-scrolling:touch;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:.25rem 0}
 .rsec{color:var(--mu);font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;padding:.7rem 1rem .25rem}
@@ -71,11 +72,12 @@ button{font:inherit;color:inherit;cursor:pointer}
   transition:height .2s;padding:0 var(--sr) var(--sb) var(--sl)}
 #sheet.full{--sheet:88}
 #sheet[hidden]{display:none}
-#handle{border:0;background:none;padding:.6rem 0 .3rem;display:flex;justify-content:center;flex:none;width:100%}
-#handle span{width:2.8rem;height:.32rem;border-radius:9px;background:#3a4a5e}
-.x{position:absolute;right:.7rem;top:.7rem;width:2.3rem;height:2.3rem;border-radius:50%;border:0;background:var(--panel2);font-size:1.25rem;line-height:1}
+#handle{border:0;background:none;padding:.75rem 0 .55rem;display:flex;justify-content:center;flex:none;width:100%;touch-action:none}
+#handle span{width:3.2rem;height:.36rem;border-radius:9px;background:#4b5d73}
+.x{position:absolute;right:.6rem;top:.6rem;z-index:3;width:2.9rem;height:2.9rem;border-radius:50%;border:1px solid #3a4a5e;background:#243142;color:#fff;font-size:1.5rem;line-height:1;display:flex;align-items:center;justify-content:center}
+.x:active{background:#334256}
 #sbody{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:.1rem 1rem 1.2rem}
-.sh-t{font-weight:700;font-size:1.25rem;line-height:1.25;padding-right:2.6rem}
+.sh-t{font-weight:700;font-size:1.25rem;line-height:1.25;padding-right:3.2rem}
 .sh-s{color:var(--mu);font-size:.88rem;margin-top:.15rem}
 .stat{border-radius:1rem;padding:.8rem .9rem;margin-top:.7rem;color:#0b0f14}
 .stat .k{font-weight:800;font-size:1.12rem}
