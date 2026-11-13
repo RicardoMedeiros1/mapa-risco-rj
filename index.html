@@ -14,7 +14,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="app.css?v=5">
+<link rel="stylesheet" href="app.css?v=6">
 </head>
 <body>
 <div id="map"></div>
@@ -53,6 +53,9 @@
     <label class="tg"><input type="checkbox" id="o-sound"> Som de alerta ao chegar perto de uma área</label>
     <label class="tg"><input type="checkbox" id="o-vib"> Vibrar (Android)</label>
     <label class="tg"><input type="checkbox" id="o-wake"> Manter a tela ligada com o GPS ativo</label>
+    <div class="sec">App</div>
+    <div class="appv"><span id="ver"></span></div>
+    <div class="seg"><button id="upd">Verificar atualização</button><button id="fix">Forçar atualização</button></div>
     <div class="sec">Sobre</div>
     <div id="about"></div>
   </div>
@@ -62,6 +65,6 @@
 <div id="boot"><div class="spin"></div><div>Carregando áreas…</div></div>
 
 <script src="vendor/leaflet.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

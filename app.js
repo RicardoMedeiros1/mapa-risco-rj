@@ -1,5 +1,6 @@
 'use strict';
-/* Mapa de Risco RJ — app de mapa com busca, GPS e alertas. Tudo roda no aparelho. */
+/* Mapa de Risco RJ — app de mapa com busca, GPS, rotas e alertas. Tudo roda no aparelho. */
+const APP_VERSION = '2026.11.13';
 
 const LAT0 = -22.5, KX = 111320 * Math.cos(LAT0 * Math.PI / 180), KY = 110540;
 const GDEF = {
@@ -132,6 +133,18 @@ function statusLine(k, as, reach) {
     case 'IM': return 'O CEP não tem posição exata: o ponto é o centro aproximado da região dele. Use a lista de áreas abaixo como referência.';
   }
 }
+/* classificação rápida para os selos da lista de resultados */
+function quickK(lat, lon, reach, imprecise) {
+  if (imprecise) return 'IM';
+  const x = lon * KX, y = lat * KY, lim = Math.max(600, reach || 0); let inA = false, inN = false, d = Infinity;
+  for (const a of AR) {
+    if (bboxDist(a, x, y) > lim) continue;
+    if (inPoly(a, x, y)) { if (a.armed) inA = true; else inN = true; }
+    else if (a.armed) { const c = closest(a, x, y).d; if (c < d) d = c; }
+  }
+  if (inA) return 'IN'; if (d <= Math.max(150, reach || 0)) return 'MP'; if (inN) return 'NE'; if (d <= 600) return 'PX'; return 'FO';
+}
+const chipH = k => `<span class="chip" style="background:var(--s-${k})">${ST[k].sh}</span>`;
 const plain = h => h.replace(/<span class="gtag"[^>]*>([^<]*)<\/span>/g, '($1)').replace(/<[^>]+>/g, '');
 
 /* ===================== dados ===================== */
@@ -282,6 +295,7 @@ function selectPoint(lat, lon, o) {
   const reach = o.reach || 0;
   const k = o.imprecise ? 'IM' : classify(as, reach);
   sel = Object.assign({lat, lon, x, y, as, k, reach}, o);
+  if (o.kind !== 'gps') clearRoutes();
   if (!sel.title) {
     const ns = nearestStreet(x, y);
     sel.title = o.kind === 'gps' ? 'Sua localização' : (as.inArmed[0] ? as.inArmed[0].name : (ns ? RU.D.streets[RU.SI[ns.r]] : 'Ponto no mapa'));
@@ -336,15 +350,16 @@ function renderSheet() {
     <div class="radius"><span class="l">Favelas próximas</span>${rch}</div>
     <div class="summ">${summ}</div>
     ${rows || '<div class="empty">Nenhuma comunidade mapeada nesse raio.</div>'}
-    <div class="acts"><a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${dest}" target="_blank" rel="noopener">Rota Google</a>
-    <a class="btn" href="https://waze.com/ul?ll=${dest}&navigate=yes" target="_blank" rel="noopener">Rota Waze</a>
-    <button class="btn p" id="cpy">Copiar</button></div>
+    <div class="acts">${s.kind !== 'gps' ? '<button class="btn p wide" id="rsafe">🛡️ Ver rota segura até aqui</button>' : ''}
+    <a class="btn" href="https://www.google.com/maps/dir/?api=1&destination=${dest}" target="_blank" rel="noopener">Google Maps</a>
+    <a class="btn" href="https://waze.com/ul?ll=${dest}&navigate=yes" target="_blank" rel="noopener">Waze</a>
+    <button class="btn" id="shr">Compartilhar</button><button class="btn" id="cpy">Copiar</button></div>
     ${note ? `<div class="note">${esc(note)}</div>` : ''}
     <div class="note">Mapa colaborativo, não oficial. As divisas são aproximadas e mudam; na dúvida, confirme com quem conhece o local.</div>`;
   openSheet();
 }
 function openSheet() { const sh = $('sheet'); sh.hidden = false; $('fabs').style.bottom = `calc(${sh.classList.contains('full') ? 88 : 48} * var(--vh) + .8rem)`; }
-function closeSheet() { $('sheet').hidden = true; $('sheet').classList.remove('full'); $('fabs').style.bottom = ''; sel = null; selLayer.clearLayers(); }
+function closeSheet() { $('sheet').hidden = true; $('sheet').classList.remove('full'); $('fabs').style.bottom = ''; sel = null; selLayer.clearLayers(); clearRoutes(); }
 $('sclose').onclick = closeSheet;
 $('handle').onclick = () => { $('sheet').classList.toggle('full'); openSheet(); };
 $('sbody').addEventListener('click', async e => {
@@ -352,6 +367,17 @@ $('sbody').addEventListener('click', async e => {
   if (rb) { radius = +rb.dataset.rad; store.set('radius', radius); if (sel) { sel.as = assess(sel.x, sel.y, Math.max(3000, radius)); drawSel(); renderSheet(); const c = L.latLng(sel.lat, sel.lon).toBounds(radius * 2.2); map.flyToBounds(c, {paddingBottomRight: [0, $('sheet').getBoundingClientRect().height], duration: 0.5}); } return; }
   const ra = e.target.closest('[data-a]');
   if (ra) { const a = AR[+ra.dataset.a]; highlight(a); map.flyToBounds(a.layer.getBounds().pad(0.6), {paddingBottomRight: [0, $('sheet').getBoundingClientRect().height], maxZoom: 17, duration: 0.6}); if (gps.follow) setFollow(false); return; }
+  if (e.target.closest('#rsafe')) { planRoute(); return; }
+  const rc = e.target.closest('[data-ri]');
+  if (rc) { routeSel = +rc.dataset.ri; drawRoutes(true); renderRouteSheet(); return; }
+  if (e.target.closest('#rback')) { clearRoutes(); renderSheet(); return; }
+  if (e.target.id === 'shr' && sel) {
+    const url = location.origin + location.pathname + `?ll=${sel.lat.toFixed(6)},${sel.lon.toFixed(6)}&t=${encodeURIComponent(sel.title || '')}`;
+    const text = `${sel.title}: ${ST[sel.k].ic} ${ST[sel.k].t}`;
+    if (navigator.share) { try { await navigator.share({title: 'Mapa de Risco RJ', text, url}); } catch (err) {} }
+    else { try { await navigator.clipboard.writeText(text + '\n' + url); toast('Link copiado'); } catch (err) { toast('Não foi possível copiar'); } }
+    return;
+  }
   if (e.target.id === 'cpy' && sel) {
     const txt = `${sel.title}${sel.sub ? ' — ' + sel.sub : ''}\n${ST[sel.k].ic} ${ST[sel.k].t}: ${plain(statusLine(sel.k, sel.as, sel.reach))}\n` +
       `Favelas em ${fmtD(radius)}: ` + (sel.as.near.filter(n => n.d <= radius && n.a.armed).slice(0, 8).map(n => `${n.a.name} (${GDEF[n.a.gk].s}, ${n.d ? fmtD(n.d) : 'dentro'})`).join('; ') || 'nenhuma') +
@@ -436,14 +462,20 @@ async function photon(q, signal) {
     return {type: 'osm', lat, lon, title, sub, exact: !!p.housenumber};
   }).filter(o => { const k = o.title + '|' + o.sub; if (seen.has(k)) return false; seen.add(k); return true; });
 }
+function bestRow(G, r) { const U = RU; if (r != null) return r; return G.rows.find(x => U.Q[x] === 0) ?? G.rows.find(x => U.Q[x] === 3) ?? G.rows[0]; }
 function ritem(o, i) {
   let k, t, s;
   if (o.type === 'area') { k = `<span class="k" style="background:${GDEF[o.a.gk].c};color:#fff;font-size:10px;font-weight:800">${esc(GDEF[o.a.gk].s.slice(0, 3))}</span>`; t = o.a.name; s = `Comunidade · ${GDEF[o.a.gk].n}${o.a.bairro ? ' · ' + o.a.bairro : ''}${o.a.city ? ' · ' + o.a.city : ''}`; }
   else if (o.type === 'rua') { const U = RU, G = U.GR[o.g]; k = '<span class="k">🛣️</span>'; t = U.D.streets[G.st]; s = `${U.D.bairros[G.nb]} · ${U.D.cities[G.ci]} · ` + (o.r != null ? 'CEP ' + fmtCep(U.CEP[o.r]) : (G.rows.length > 1 ? G.rows.length + ' CEPs' : 'CEP ' + fmtCep(U.CEP[G.rows[0]]))); }
   else if (o.type === 'osm') { k = `<span class="k">${o.exact ? '🏠' : '📍'}</span>`; t = o.title; s = o.sub; }
   else if (o.type === 'pt') { k = '<span class="k">🎯</span>'; t = `Coordenada ${o.lat.toFixed(5)}, ${o.lon.toFixed(5)}`; s = 'Ponto informado'; }
-  else if (o.type === 'rec') { return ritem(o.o, i).replace('class="ritem"', 'class="ritem" data-rec="1"'); }
-  return `<button class="ritem" data-i="${i}">${k}<div class="m"><div class="t">${esc(t)}</div><div class="s">${esc(s)}</div></div></button>`;
+  let kk = null;
+  try {
+    if (o.type === 'area') kk = o.a.armed ? 'IN' : 'NE';
+    else if (o.type === 'rua') { const r = bestRow(RU.GR[o.g], o.r), rl = rowLoc(r); kk = quickK(rl.lat, rl.lon, rl.reach, rl.imprecise); }
+    else if (o.type === 'osm' || o.type === 'pt') kk = quickK(o.lat, o.lon, 0, false);
+  } catch (e) {}
+  return `<button class="ritem" data-i="${i}">${k}<div class="m"><div class="t">${esc(t)}</div><div class="s">${esc(s)}</div></div>${kk ? chipH(kk) : ''}</button>`;
 }
 function renderResults(local, osm, osmState) {
   const box = $('results'); curItems = [];
@@ -497,7 +529,8 @@ function showRecents() {
   const rec = store.get('recentes', []);
   if (!rec.length) { $('results').hidden = true; curItems = []; return; }
   curItems = []; let h = '<div class="rsec">Recentes</div>';
-  for (const o of rec) { h += `<button class="ritem" data-i="${curItems.length}"><span class="k">🕘</span><div class="m"><div class="t">${esc(o.title)}</div><div class="s">${esc(o.sub || '')}</div></div></button>`; curItems.push({type: 'recent', o}); }
+  for (const o of rec) { let kk = null; try { kk = o.kind === 'area' ? (AR[o.ai] && AR[o.ai].armed ? 'IN' : 'NE') : quickK(o.lat, o.lon, o.reach, o.imprecise); } catch (e) {}
+    h += `<button class="ritem" data-i="${curItems.length}"><span class="k">🕘</span><div class="m"><div class="t">${esc(o.title)}</div><div class="s">${esc(o.sub || '')}</div></div>${kk ? chipH(kk) : ''}</button>`; curItems.push({type: 'recent', o}); }
   $('results').innerHTML = h; $('results').hidden = false;
 }
 function closeResults() { $('results').hidden = true; $('q').blur(); }
@@ -512,7 +545,7 @@ function pickItem(o) {
   } else if (o.type === 'rua') {
     const U = RU, G = U.GR[o.g];
     // escolhe o trecho (CEP) informado ou o mais preciso
-    let r = o.r; if (r == null) r = G.rows.find(x => U.Q[x] === 0) ?? G.rows.find(x => U.Q[x] === 3) ?? G.rows[0];
+    const r = bestRow(G, o.r);
     const rl = rowLoc(r);
     loc = {lat: rl.lat, lon: rl.lon, reach: rl.reach, imprecise: rl.imprecise, ra: rl.ra, kind: 'rua', title: U.D.streets[G.st],
       sub: `${U.D.bairros[G.nb]} · ${U.D.cities[G.ci]} · CEP ${fmtCep(U.CEP[r])}`};
@@ -566,7 +599,7 @@ function startGps() {
 function stopGps() {
   if (gps.watch != null) navigator.geolocation.clearWatch(gps.watch);
   gps.on = false; gps.watch = null; gps.pos = null; gps.level = 0; setFollow(false); $('gps').classList.remove('on');
-  meLayer.clearLayers(); gps.marker = null; gps.acc = null; $('gbanner').hidden = true;
+  meLayer.clearLayers(); gps.marker = null; gps.acc = null; gps.line = null; $('gbanner').hidden = true;
   if (gps.wake) { try { gps.wake.release(); } catch (e) {} gps.wake = null; }
 }
 $('gps').onclick = () => { if (!gps.on) startGps(); else if (!gps.follow) setFollow(true); else stopGps(); };
@@ -597,6 +630,11 @@ function onPos(p) {
   if (lvl > gps.level && lvl >= 1) alertUser(lvl);
   gps.level = lvl;
   renderBanner(k, as, x, y, acc);
+  if (!as.inArmed.length && na && na.d <= 2000) {
+    const ll = [[lat, lon], [na.y / KY, na.x / KX]], col = cssVar('--s-' + k);
+    if (!gps.line) gps.line = L.polyline(ll, {renderer: canvasR, color: col, weight: 3, dashArray: '6 6', opacity: 0.9, interactive: false}).addTo(meLayer);
+    else gps.line.setLatLngs(ll).setStyle({color: col});
+  } else if (gps.line) { meLayer.removeLayer(gps.line); gps.line = null; }
   if (sel && sel.kind === 'gps' && !$('sheet').hidden) { const st = $('sbody').scrollTop; selectPoint(lat, lon, {kind: 'gps', acc}); $('sbody').scrollTop = st; }
 }
 function alertUser(lvl) {
@@ -650,7 +688,11 @@ function buildPanel() {
   <p><b>Como usar:</b> busque um endereço, rua, CEP ou comunidade, ou toque em qualquer ponto do mapa. O painel mostra se o local está dentro/perto de uma área e lista as favelas no raio escolhido. Com o botão de GPS (◎) o mapa acompanha você e avisa ao chegar perto de uma área (toque de novo para soltar/desligar).</p>
   <p><b>Instalar como app:</b> ${isIOS ? 'no Safari, toque em Compartilhar › “Adicionar à Tela de Início”.' : 'no menu do navegador, toque em “Instalar app” ou “Adicionar à tela inicial”.'} Os alertas só funcionam com o app aberto na tela.</p>
   <p><b>Fontes:</b> áreas do mapa colaborativo “[UTILIDADE PÚBLICA] Mapa Das Facções RJ” (Google My Maps), copiado em 11/11/2026 — não oficial, divisas aproximadas. Ruas e CEPs: <a href="https://www.cepaberto.com/" target="_blank" rel="noopener">CEP Aberto</a> (ODbL) com coordenadas do CNEFE/IBGE (Censo 2022). Busca de endereços: <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a>/OpenStreetMap. Mapa base: © OpenStreetMap; satélite © Esri.</p>
-  <p><b>Níveis:</b> Dentro = ponto dentro de área marcada · Muito perto = até 150 m · Próximo = até 600 m · Fora = nada a menos de 600 m (não é garantia de segurança).</p>`;
+  <p><b>Níveis:</b> Dentro = ponto dentro de área marcada · Muito perto = até 150 m · Próximo = até 600 m · Fora = nada a menos de 600 m (não é garantia de segurança).</p>
+  <p><b>Rota segura:</b> calculada pelo OSRM (OpenStreetMap). O app testa caminhos alternativos e mostra quais áreas cada um atravessa. Ao abrir no Google Maps, vão pontos intermediários para manter o trajeto escolhido.</p>`;
+  $('ver').textContent = 'Versão ' + APP_VERSION;
+  $('upd').onclick = () => checkUpdate(true);
+  $('fix').onclick = hardRefresh;
 }
 $('menu').onclick = () => { $('panel').hidden = false; };
 $('pclose').onclick = () => { $('panel').hidden = true; };
@@ -665,9 +707,190 @@ $('panel').onclick = e => { if (e.target.id === 'panel') $('panel').hidden = tru
     loadRuas().then(() => { if (!$('results').hidden && $('q').value.trim()) doSearch(true); }).catch(e => console.warn('ruas', e));
     // links do tipo ?q=... ou ?ll=lat,lon
     const u = new URLSearchParams(location.search);
-    if (u.get('ll')) { const c = parseCoords(u.get('ll')); if (c) selectPoint(c.la, c.lo, {fly: true, kind: 'pt'}); }
+    if (u.get('ll')) { const c = parseCoords(u.get('ll')); if (c) selectPoint(c.la, c.lo, Object.assign({fly: true, kind: 'pt'}, u.get('t') ? {title: u.get('t'), sub: 'Local compartilhado'} : {})); }
+    if (u.has('r')) history.replaceState(null, '', location.pathname);
   } catch (e) {
     $('boot').innerHTML = '<div style="padding:20px;text-align:center">Não foi possível carregar os dados.<br>' + esc(e.message) + '</div>';
   }
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  initUpdates();
 })();
+
+/* ===================== rota segura ===================== */
+const ROUTERS = ['https://routing.openstreetmap.de/routed-car/route/v1/driving/', 'https://router.project-osrm.org/route/v1/driving/'];
+let routeLayer = null, routes = [], routeSel = 0, routeDest = null, GRID = null;
+const GC = 1000;
+function buildGrid() {
+  GRID = new Map();
+  for (const a of AR) {
+    if (!a.armed) continue;
+    const x0 = Math.floor((a.minx - 120) / GC), x1 = Math.floor((a.maxx + 120) / GC), y0 = Math.floor((a.miny - 120) / GC), y1 = Math.floor((a.maxy + 120) / GC);
+    for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) { const k = i + ',' + j; let l = GRID.get(k); if (!l) GRID.set(k, l = []); l.push(a); }
+  }
+}
+const gridAt = (x, y) => GRID.get(Math.floor(x / GC) + ',' + Math.floor(y / GC)) || [];
+async function osrm(pts, alts) {
+  const path = pts.map(c => c[1].toFixed(6) + ',' + c[0].toFixed(6)).join(';');
+  const q = '?overview=full&geometries=geojson' + (alts ? '&alternatives=3' : '');
+  let err = null;
+  for (const base of ROUTERS) {
+    try { const r = await fetch(base + path + q); const j = await r.json(); if (j.code === 'Ok' && j.routes && j.routes.length) return j.routes; err = new Error(j.code || 'erro'); }
+    catch (e) { err = e; }
+  }
+  throw err;
+}
+/* percorre a rota a cada ~20 m e anota as áreas atravessadas e as que ficam a menos de 100 m */
+function evalRoute(rt) {
+  const C = rt.geometry.coordinates, P = C.map(([lo, la]) => [lo * KX, la * KY]);
+  const hits = new Map(), segs = []; let cur = null;
+  for (let i = 0; i < P.length - 1; i++) {
+    const [x1, y1] = P[i], [x2, y2] = P[i + 1], L = Math.hypot(x2 - x1, y2 - y1), n = Math.max(1, Math.ceil(L / 20)), step = L / n;
+    for (let k = 0; k < n; k++) {
+      const t = k / n, x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+      let inside = false;
+      for (const a of gridAt(x, y)) {
+        if (x < a.minx - 100 || x > a.maxx + 100 || y < a.miny - 100 || y > a.maxy + 100) continue;
+        let h = hits.get(a);
+        if (x >= a.minx && x <= a.maxx && y >= a.miny && y <= a.maxy && inPoly(a, x, y)) {
+          if (!h) hits.set(a, h = {a, inM: 0, minD: 0, pos: i}); h.inM += step; h.minD = 0; inside = true;
+        } else {
+          const d = closest(a, x, y).d;
+          if (d <= 100) { if (!h) hits.set(a, h = {a, inM: 0, minD: d, pos: i}); else if (d < h.minD) h.minD = d; }
+        }
+      }
+      const ll = [y / KY, x / KX];
+      if (inside) { if (!cur) { cur = [ll]; segs.push(cur); } else cur.push(ll); }
+      else if (cur) { cur.push(ll); cur = null; }
+    }
+  }
+  const list = [...hits.values()].sort((p, q) => p.pos - q.pos);
+  const crossed = list.filter(h => h.inM > 0), near = list.filter(h => h.inM === 0);
+  return {P, crossed, near, inM: crossed.reduce((s, h) => s + h.inM, 0), segs, dist: rt.distance, dur: rt.duration, ll: C.map(([lo, la]) => [la, lo])};
+}
+const routeScore = r => (r.inM > 0 ? 1e9 : 0) + r.inM * 1e4 + r.near.length * 120 + r.dur;
+/* pontos de desvio dos dois lados das áreas atravessadas */
+function detourVias(ev) {
+  const vias = [];
+  for (const h of ev.crossed.slice(0, 2)) {
+    const a = h.a, cx = (a.minx + a.maxx) / 2, cy = (a.miny + a.maxy) / 2, R = Math.max(a.maxx - a.minx, a.maxy - a.miny) / 2;
+    const i = Math.min(h.pos, ev.P.length - 1), p1 = ev.P[Math.max(0, i - 4)], p2 = ev.P[Math.min(ev.P.length - 1, i + 4)];
+    let dx = p2[0] - p1[0], dy = p2[1] - p1[1]; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+    const off = R + 500;
+    for (const sg of [1, -1]) vias.push([(cy + dx * off * sg) / KY, (cx - dy * off * sg) / KX]);
+  }
+  return vias.slice(0, 4);
+}
+function getOrigin() {
+  if (gps.pos) return Promise.resolve([gps.pos.lat, gps.pos.lon]);
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error('GPS indisponível neste aparelho.'));
+    navigator.geolocation.getCurrentPosition(p => res([p.coords.latitude, p.coords.longitude]),
+      e => rej(new Error(e.code === 1 ? 'Permita o acesso à localização para calcular a rota.' : 'Não consegui pegar sua localização.')),
+      {enableHighAccuracy: true, timeout: 15000, maximumAge: 30000});
+  });
+}
+async function planRoute() {
+  if (!sel) return;
+  routeDest = {lat: sel.lat, lon: sel.lon, title: sel.title};
+  $('sbody').innerHTML = '<div class="sh-t">Rota segura</div><div class="sh-s">Pegando sua localização e calculando caminhos…</div><div style="display:flex;justify-content:center;padding:1.5rem"><div class="spin"></div></div>';
+  let origin;
+  try { origin = await getOrigin(); } catch (e) { toast(e.message, 4000); renderSheet(); return; }
+  if (!GRID) buildGrid();
+  let evs = [];
+  try {
+    evs = (await osrm([origin, [routeDest.lat, routeDest.lon]], true)).map(evalRoute);
+    evs.sort((p, q) => routeScore(p) - routeScore(q));
+    if (evs[0].inM > 0) {
+      const extra = await Promise.allSettled(detourVias(evs[0]).map(v => osrm([origin, v, [routeDest.lat, routeDest.lon]], false)));
+      for (const r of extra) if (r.status === 'fulfilled') evs.push(evalRoute(r.value[0]));
+    }
+  } catch (e) { toast('Não foi possível calcular a rota agora (sem internet ou serviço de rotas fora do ar).', 4500); renderSheet(); return; }
+  const seen = new Set();
+  evs = evs.filter(r => { const k = Math.round(r.dist / 150) + ':' + Math.round(r.dur / 45); if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((p, q) => routeScore(p) - routeScore(q)).slice(0, 4);
+  // descarta desvios absurdos (mais que 2,5x o tempo da rota mais rápida)
+  const fastest = Math.min(...evs.map(r => r.dur));
+  routes = evs.filter(r => r.dur <= fastest * 2.5);
+  routes.origin = origin; routeSel = 0;
+  if (gps.follow) setFollow(false);
+  drawRoutes(true); renderRouteSheet();
+}
+function clearRoutes() { if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; } routes = []; }
+function drawRoutes(fit) {
+  if (routeLayer) map.removeLayer(routeLayer);
+  routeLayer = L.layerGroup().addTo(map);
+  routes.forEach((r, i) => { if (i !== routeSel) L.polyline(r.ll, {renderer: canvasR, color: '#475569', weight: 5, opacity: 0.75, interactive: false}).addTo(routeLayer); });
+  const r = routes[routeSel]; if (!r) return;
+  L.polyline(r.ll, {renderer: canvasR, color: '#fff', weight: 10, opacity: 0.95, interactive: false}).addTo(routeLayer);
+  L.polyline(r.ll, {renderer: canvasR, color: '#0284c7', weight: 6, opacity: 1, interactive: false}).addTo(routeLayer);
+  for (const sgm of r.segs) L.polyline(sgm, {renderer: canvasR, color: '#ef4444', weight: 7, opacity: 1, interactive: false}).addTo(routeLayer);
+  L.circleMarker(routes.origin, {renderer: canvasR, radius: 7, color: '#fff', weight: 3, fillColor: '#0284c7', fillOpacity: 1, interactive: false}).addTo(routeLayer);
+  if (fit) map.flyToBounds(L.latLngBounds(r.ll).pad(0.08), {paddingTopLeft: [20, 90], paddingBottomRight: [20, $('sheet').getBoundingClientRect().height + 20], duration: 0.6, maxZoom: 16});
+}
+const fmtT = s => s < 3600 ? Math.max(1, Math.round(s / 60)) + ' min' : Math.floor(s / 3600) + ' h ' + String(Math.round(s % 3600 / 60)).padStart(2, '0');
+function routeVerdict(r) {
+  if (r.crossed.length) return `<span style="color:var(--s-IN)">⛔ Passa por ${r.crossed.length} área${r.crossed.length > 1 ? 's' : ''}</span>`;
+  if (r.near.length) return `<span style="color:var(--s-MP)">⚠️ Não entra em áreas, mas passa a menos de 100 m de ${r.near.length}</span>`;
+  return '<span style="color:var(--s-FO)">✓ Não passa por áreas mapeadas</span>';
+}
+function gmapsRouteUrl(r) {
+  const o = routes.origin, d = r.ll[r.ll.length - 1], wp = [];
+  let acc = 0; const total = r.P.reduce((s, p, i) => i ? s + Math.hypot(p[0] - r.P[i - 1][0], p[1] - r.P[i - 1][1]) : 0, 0);
+  const marks = [0.25, 0.5, 0.75]; let mi = 0;
+  for (let i = 1; i < r.P.length && mi < marks.length; i++) {
+    acc += Math.hypot(r.P[i][0] - r.P[i - 1][0], r.P[i][1] - r.P[i - 1][1]);
+    if (acc >= total * marks[mi]) { wp.push(r.ll[i][0].toFixed(6) + ',' + r.ll[i][1].toFixed(6)); mi++; }
+  }
+  return `https://www.google.com/maps/dir/?api=1&origin=${o[0].toFixed(6)},${o[1].toFixed(6)}&destination=${routeDest.lat.toFixed(6)},${routeDest.lon.toFixed(6)}&travelmode=driving&waypoints=${encodeURIComponent(wp.join('|'))}`;
+}
+function renderRouteSheet() {
+  const r = routes[routeSel];
+  const cards = routes.map((x, i) => `<button class="rcard${i === routeSel ? ' on' : ''}" data-ri="${i}"><div class="rt"><b>${fmtT(x.dur)}</b> · ${fmtD(x.dist)}${i === 0 ? ' <span class="best">mais segura</span>' : ''}</div><div class="rv">${routeVerdict(x)}</div></button>`).join('');
+  const crossedH = r.crossed.length ? '<div class="sec2">Áreas atravessadas por esta rota</div>' + r.crossed.map(h => `<button class="row" data-a="${h.a.i}"><span class="sq" style="background:${GDEF[h.a.gk].c}"></span><div class="m"><div class="t">${esc(h.a.name)}</div><div class="s">${esc(GDEF[h.a.gk].n)}${h.a.bairro ? ' · ' + esc(h.a.bairro) : ''}</div></div><div class="r">${fmtD(h.inM)}<small>dentro</small></div></button>`).join('') : '';
+  const nearH = r.near.length ? '<div class="sec2">Passa perto (menos de 100 m)</div>' + r.near.map(h => `<button class="row" data-a="${h.a.i}"><span class="sq" style="background:${GDEF[h.a.gk].c}"></span><div class="m"><div class="t">${esc(h.a.name)}</div><div class="s">${esc(GDEF[h.a.gk].n)}</div></div><div class="r">${fmtD(h.minD)}</div></button>`).join('') : '';
+  const allBad = routes.every(x => x.crossed.length);
+  $('sbody').innerHTML = `<div class="sh-t">Rotas até ${esc(routeDest.title || 'o destino')}</div><div class="sh-s">Saindo da sua localização · de carro</div>
+    ${allBad ? '<div class="note" style="color:#fca5a5">Não achei caminho que evite todas as áreas. A primeira opção é a que passa menos tempo dentro delas.</div>' : ''}
+    <div class="rcards">${cards}</div>${crossedH}${nearH}
+    <div class="acts"><a class="btn p wide" href="${gmapsRouteUrl(r)}" target="_blank" rel="noopener">Abrir esta rota no Google Maps</a>
+    <button class="btn" id="rback">‹ Voltar</button></div>
+    <div class="note">Trechos em vermelho no mapa = dentro de área. O Waze não aceita pontos intermediários, por isso a rota escolhida abre no Google Maps. Rotas: OSRM/OpenStreetMap.</div>`;
+  openSheet(); $('sbody').scrollTop = 0;
+}
+
+/* ===================== atualização automática ===================== */
+let swReg = null, lastCheck = 0, reloading = false;
+function safeReload(msg) {
+  if (reloading) return;
+  if (gps.on) { toast('Nova versão do app baixada. Ela entra quando você reabrir o app.', 4000); return; }
+  reloading = true; toast(msg || 'Atualizando o app…', 1500);
+  setTimeout(() => location.reload(), 700);
+}
+async function checkUpdate(manual) {
+  lastCheck = Date.now();
+  try {
+    if (swReg) swReg.update().catch(() => {});
+    const j = await (await fetch('version.json?ts=' + Date.now(), {cache: 'no-store'})).json();
+    if (j.v && j.v !== APP_VERSION) {
+      const last = +(sessionStorage.getItem('rrj.upd') || 0);
+      if (Date.now() - last > 60000) { sessionStorage.setItem('rrj.upd', Date.now()); safeReload('Nova versão encontrada. Atualizando…'); }
+      else if (manual) hardRefresh();
+    } else if (manual) toast('Você já está na versão mais nova (' + APP_VERSION + ').');
+  } catch (e) { if (manual) toast('Sem internet para verificar atualização.'); }
+}
+async function hardRefresh() {
+  toast('Limpando e recarregando…', 1500);
+  try {
+    if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    if (window.caches) for (const k of await caches.keys()) if (k !== 'tiles') await caches.delete(k);
+  } catch (e) {}
+  setTimeout(() => location.replace(location.pathname + '?r=' + Date.now()), 500);
+}
+async function initUpdates() {
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) safeReload(); });
+    try { swReg = await navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}); } catch (e) {}
+  }
+  checkUpdate(false);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck > 60000) checkUpdate(false); });
+}

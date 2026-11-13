@@ -1,5 +1,5 @@
 /* Service worker: app e dados funcionam offline; mapa base fica em cache conforme você navega. */
-const V = 'v3';
+const V = 'v4';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'vendor/leaflet.js', 'vendor/leaflet.css',
   'icons/icon-192.png', 'icons/apple-touch-icon.png', 'icons/maskable-512.png', 'data/areas.json', 'data/ruas.json'];
 self.addEventListener('install', e => {
@@ -18,6 +18,7 @@ async function trim(c) {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const u = new URL(e.request.url);
+  if (u.origin === location.origin && u.pathname.endsWith('/version.json')) return; // sempre da rede
   if (u.origin === location.origin) {
     const isData = u.pathname.includes('/data/');
     e.respondWith(caches.open('shell-' + V).then(async c => {

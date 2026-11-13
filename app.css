@@ -137,3 +137,15 @@ button{font:inherit;color:inherit;cursor:pointer}
 #boot.off{display:none}
 .spin{width:2.2rem;height:2.2rem;border-radius:50%;border:3px solid var(--line);border-top-color:var(--acc);animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+
+/* rotas */
+.btn.wide{flex-basis:100%}
+.rcards{display:flex;flex-direction:column;gap:.5rem;margin-top:.8rem}
+.rcard{border:1px solid var(--line);background:var(--panel2);border-radius:.9rem;padding:.7rem .85rem;text-align:left;width:100%}
+.rcard.on{border-color:var(--acc);box-shadow:0 0 0 2px rgba(56,189,248,.35) inset}
+.rcard .rt{font-size:1rem}
+.rcard .rv{font-size:.88rem;font-weight:600;margin-top:.15rem}
+.rcard .best{font-size:.7rem;font-weight:800;background:var(--acc);color:#04121b;border-radius:999px;padding:.08rem .45rem;margin-left:.3rem;vertical-align:.1em}
+.sec2{color:var(--mu);font-size:.75rem;text-transform:uppercase;letter-spacing:.6px;margin:1rem 0 .2rem}
+.ritem .chip{margin-left:.2rem}
+.appv{color:#c9d4de;font-size:.9rem;margin-bottom:.5rem}
